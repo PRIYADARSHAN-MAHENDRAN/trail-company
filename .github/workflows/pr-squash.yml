@@ -1,0 +1,35 @@
+name: Auto Squash Commits (Preserve Last Commit)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - dev # only triggers for PRs targeting dev branch
+
+permissions:
+  contents: write # required for pushing changes
+
+jobs:
+  auto-squash:
+    if: ${{ github.event.pull_request.base.ref == 'dev' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # required for full git history
+          persist-credentials: true # use GITHUB_TOKEN for push
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Auto Squash Script
+        run: |
+          chmod +x ./scripts/auto-squash.sh
+          ./scripts/auto-squash.sh
+
+      - name: Confirm Auto Squash Completed
+        run: echo "✅ Auto-squash job finished successfully for PR -> dev."
