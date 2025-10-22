@@ -1,0 +1,32 @@
+name: Auto Squash Commits (Preserve Last Commit)
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+jobs:
+  auto-squash:
+    if: ${{ github.event.pull_request.base.ref == 'dev' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR branch (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Run Auto Squash Script
+        run: |
+          chmod +x ./scripts/auto-squash.sh
+          bash -x ./scripts/auto-squash.sh
