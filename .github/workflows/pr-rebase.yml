@@ -1,0 +1,67 @@
+name: PR Rebase Automation
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+permissions:
+  contents: write # allow pushing changes
+  pull-requests: write
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pull request branch (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history needed for rebase
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Make script executable
+        run: chmod +x scripts/auto_rebase.sh
+
+      - name: Run auto rebase script
+        id: rebase
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          if ./scripts/auto_rebase.sh; then
+            echo "rebase_succeeded=true" >> $GITHUB_OUTPUT
+          else
+            echo "rebase_succeeded=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if HEAD changed vs origin (push only if new commits)
+        if: steps.rebase.outputs.rebase_succeeded == 'true'
+        id: check_push
+        run: |
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          echo "Branch is $branch"
+          # Compare local HEAD to remote branch at origin (may not exist if PR from fork)
+          remote_sha=$(git ls-remote origin "refs/heads/$branch" | awk '{print $1}' || true)
+          local_sha=$(git rev-parse HEAD)
+          echo "remote_sha=$remote_sha" >> $GITHUB_OUTPUT || true
+          echo "local_sha=$local_sha" >> $GITHUB_OUTPUT || true
+          if [ "$remote_sha" != "$local_sha" ]; then
+            echo "needs_push=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_push=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Push rebased branch (force-with-lease)
+        if: steps.check_push.outputs.needs_push == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          # Force push safely with lease
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+          git push origin HEAD:$branch --force-with-lease
