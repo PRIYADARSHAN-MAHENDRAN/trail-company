@@ -1,0 +1,32 @@
+name: PR Rebase Automation
+
+on:
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Rebase current branch onto dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          if [[ "$branch" == "dev" || "$branch" == "prod" ]]; then
+              echo "You are on the dev or prod branch."
+              exit 0
+          else
+              git fetch origin dev
+              git rebase origin/dev
+          fi
+
+      - name: Push changes
+        if: success()
+        run: |
+          git push --force-with-lease
