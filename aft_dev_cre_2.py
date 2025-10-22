@@ -1,2 +1,3 @@
 print("aft_dev_cre_2")
-print("priri")
+print("ASgalya f6")
+print("Donnnnnnnnnn")
